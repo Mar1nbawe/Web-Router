@@ -2,13 +2,25 @@ package router
 
 import "net/http"
 
+type Middleware func(http.HandlerFunc) http.HandlerFunc
+
 // ~~~~~ Router ~~~~~ //
 
 type Router struct {
-	routes []RouteEntry
+	routes     []RouteEntry
+	middleware []Middleware
+}
+
+func (rtr *Router) Use(mw Middleware) {
+	rtr.middleware = append(rtr.middleware, mw)
 }
 
 func (rtr *Router) Route(method, path string, handlerFunc http.HandlerFunc) {
+
+	for _, mw := range rtr.middleware {
+		handlerFunc = mw(handlerFunc)
+	}
+
 	e := RouteEntry{
 		Method:      method,
 		Path:        path,
@@ -18,19 +30,25 @@ func (rtr *Router) Route(method, path string, handlerFunc http.HandlerFunc) {
 }
 
 func (rtr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	for _, e := range rtr.routes {
-		match := e.Match(r)
-		if !match {
-			continue
-		}
 
-		// We have a match! Call the handler, and return
-		e.HandlerFunc.ServeHTTP(w, r)
-		return
+	var handler http.HandlerFunc
+
+	for _, e := range rtr.routes {
+
+		if e.Match(r) {
+			handler = e.HandlerFunc
+			break
+		}
+	}
+	if handler == nil {
+		handler = http.NotFound
 	}
 
-	// No matches, so it's a 404
-	http.NotFound(w, r)
+	for _, mw := range rtr.middleware {
+		handler = mw(handler)
+	}
+
+	handler.ServeHTTP(w, r)
 }
 
 // ~~~~~ RouteEntry ~~~~~ //
