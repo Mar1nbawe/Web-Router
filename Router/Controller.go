@@ -1,37 +1,50 @@
 package router
 
-import "net/http"
+import (
+	"context"
+	"net/http"
+)
 
-type Middleware func(http.HandlerFunc) http.HandlerFunc
+var MessageCodes = [...]string{"Inactive", "In progress", "Available"}
 
 // ~~~~~ Router ~~~~~ //
 
 type Router struct {
-	routes     []RouteEntry
-	middleware []Middleware
+	routes         []RouteEntry
+	middleware     []Middleware
+	allowedMethods map[string][]string
 }
 
 func (rtr *Router) Use(mw Middleware) {
 	rtr.middleware = append(rtr.middleware, mw)
 }
 
-func (rtr *Router) Route(method, path string, handlerFunc http.HandlerFunc) {
+func (rtr *Router) Route(method, path string, handlerFunc http.HandlerFunc, code int) {
 
 	for _, mw := range rtr.middleware {
 		handlerFunc = mw(handlerFunc)
 	}
 
 	e := RouteEntry{
-		Method:      method,
-		Path:        path,
-		HandlerFunc: handlerFunc,
+		Method: method,
+		Path:   path,
+		HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
+			ctx := context.WithValue(r.Context(), "code", code)
+			handlerFunc(w, r.WithContext(ctx))
+		},
 	}
 	rtr.routes = append(rtr.routes, e)
+
+	if rtr.allowedMethods == nil {
+		rtr.allowedMethods = make(map[string][]string)
+	}
+	rtr.allowedMethods[path] = append(rtr.allowedMethods[path], method)
 }
 
 func (rtr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var handler http.HandlerFunc
+	var methodNotAllowed bool
 
 	for _, e := range rtr.routes {
 
@@ -39,13 +52,18 @@ func (rtr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			handler = e.HandlerFunc
 			break
 		}
-	}
-	if handler == nil {
-		handler = http.NotFound
+		if e.Path == r.URL.Path {
+			methodNotAllowed = true
+		}
 	}
 
-	for _, mw := range rtr.middleware {
-		handler = mw(handler)
+	if handler == nil {
+		if methodNotAllowed {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		} else {
+			handler = http.NotFound
+		}
+		return
 	}
 
 	handler.ServeHTTP(w, r)
