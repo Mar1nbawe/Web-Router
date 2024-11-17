@@ -2,6 +2,8 @@ package router
 
 import "net/http"
 
+// responseWriter is a minimal wrapper for http.ResponseWriter that allows the
+// written HTTP status code to be captured for logging.
 type responseWriter struct {
 	http.ResponseWriter
 	status      int

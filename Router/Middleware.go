@@ -10,6 +10,7 @@ import (
 
 type Middleware func(http.HandlerFunc) http.HandlerFunc
 
+// LoggingMiddleware logs the incoming HTTP request & its duration.
 func LoggingMiddleware(logger log.Logger) Middleware {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		fn := func(w http.ResponseWriter, r *http.Request) {
