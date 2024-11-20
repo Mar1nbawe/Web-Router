@@ -10,18 +10,24 @@ var MessageCodes = [...]string{"Inactive", "In progress", "Available"}
 // ~~~~~ Router ~~~~~ //
 
 type Router struct {
-	routes         []RouteEntry
-	middleware     []Middleware
-	allowedMethods map[string][]string
+	routes           []RouteEntry
+	globalMiddleware []Middleware
+	allowedMethods   map[string][]string
 }
 
-func (rtr *Router) Use(mw Middleware) {
-	rtr.middleware = append(rtr.middleware, mw)
+func (rtr *Router) Use(mw ...Middleware) {
+	for _, addedMw := range mw {
+		rtr.globalMiddleware = append(rtr.globalMiddleware, addedMw)
+	}
+
 }
 
-func (rtr *Router) Route(method, path string, handlerFunc http.HandlerFunc, code int) {
+func (rtr *Router) Route(method, path string, handlerFunc http.HandlerFunc, code int, specificMiddleware ...Middleware) {
 
-	for _, mw := range rtr.middleware {
+	for _, mw := range rtr.globalMiddleware {
+		handlerFunc = mw(handlerFunc)
+	}
+	for _, mw := range specificMiddleware {
 		handlerFunc = mw(handlerFunc)
 	}
 
