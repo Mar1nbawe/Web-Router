@@ -1,14 +1,27 @@
 package router
 
 import (
+	log "github.com/go-kit/kit/log"
+	cors "github.com/rs/cors"
 	"net/http"
 	"runtime/debug"
 	"time"
-
-	log "github.com/go-kit/kit/log"
 )
 
 type Middleware func(http.HandlerFunc) http.HandlerFunc
+
+// CorsMiddleware adds CORS-related securities for your handlers
+func CorsMiddleware() Middleware {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		c := cors.New(cors.Options{
+			AllowedOrigins: []string{"http://localhost:8080"},
+		})
+
+		return func(w http.ResponseWriter, r *http.Request) {
+			c.Handler(next).ServeHTTP(w, r)
+		}
+	}
+}
 
 // LoggingMiddleware logs the incoming HTTP request & its duration.
 func LoggingMiddleware(logger log.Logger) Middleware {

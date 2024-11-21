@@ -64,10 +64,11 @@ func (rtr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if handler == nil {
+		wrapped := wrapResponseWriter(w)
 		if methodNotAllowed {
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			http.Error(wrapped, "Method Not Allowed", http.StatusMethodNotAllowed)
 		} else {
-			handler = http.NotFound
+			http.NotFound(wrapped, r)
 		}
 		return
 	}
